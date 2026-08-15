@@ -5,6 +5,7 @@
 ### Improved
 
 - Set width/height for outgoing video attachments (MP4/QuickTime and WebM/Matroska)
+- Set a real thumbnail (blurhash) on outgoing video attachments when `ffmpeg` is available on PATH
 
 ## [0.14.7] - 2026-08-01
 

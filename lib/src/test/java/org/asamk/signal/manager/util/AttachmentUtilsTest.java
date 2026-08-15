@@ -1,5 +1,6 @@
 package org.asamk.signal.manager.util;
 
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
 import org.whispersystems.signalservice.api.util.StreamDetails;
 
@@ -17,6 +18,7 @@ import javax.imageio.ImageIO;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class AttachmentUtilsTest {
 
@@ -163,6 +165,45 @@ class AttachmentUtilsTest {
         assertEquals(0, attachment.getWidth());
         assertEquals(0, attachment.getHeight());
         assertArrayEquals(truncatedBytes, attachment.getInputStream().readAllBytes());
+    }
+
+    @Test
+    public void createAttachmentStream_setsBlurHashForMp4FromFileWhenVideoPreviewEnabledAndFfmpegAvailable() throws Exception {
+        Assumptions.assumeTrue(VideoThumbnailProbe.isFfmpegAvailable(), "ffmpeg not found on PATH, skipping");
+
+        final var tempFile = Files.createTempFile("attachment-utils-blurhash-test", ".mp4");
+        try {
+            final var generate = new ProcessBuilder("ffmpeg",
+                    "-y",
+                    "-v",
+                    "error",
+                    "-f",
+                    "lavfi",
+                    "-i",
+                    "testsrc=size=64x64:rate=1:duration=1",
+                    "-pix_fmt",
+                    "yuv420p",
+                    tempFile.toString()).start();
+            generate.waitFor();
+            assertEquals(0, generate.exitValue());
+
+            try (var fis = new FileInputStream(tempFile.toFile())) {
+                final var streamDetails = new StreamDetails(fis, "video/mp4", Files.size(tempFile));
+
+                final var attachment = AttachmentUtils.createAttachmentStream(streamDetails,
+                        Optional.of("clip.mp4"),
+                        false,
+                        true,
+                        null);
+
+                assertTrue(attachment.getWidth() > 0);
+                assertTrue(attachment.getHeight() > 0);
+                assertTrue(attachment.getBlurHash().isPresent(), "expected a blurhash to be set");
+                assertArrayEquals(Files.readAllBytes(tempFile), attachment.getInputStream().readAllBytes());
+            }
+        } finally {
+            Files.deleteIfExists(tempFile);
+        }
     }
 
     @Test
