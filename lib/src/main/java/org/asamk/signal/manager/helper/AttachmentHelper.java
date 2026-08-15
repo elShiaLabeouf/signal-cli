@@ -52,9 +52,10 @@ public class AttachmentHelper {
 
     public List<SignalServiceAttachment> uploadAttachments(
             final List<String> attachments,
-            boolean voiceNote
+            boolean voiceNote,
+            boolean setVideoPreview
     ) throws AttachmentInvalidException, IOException {
-        final var attachmentStreams = createAttachmentStreams(attachments, voiceNote);
+        final var attachmentStreams = createAttachmentStreams(attachments, voiceNote, setVideoPreview);
 
         try {
             // Upload attachments here, so we only upload once even for multiple recipients
@@ -71,19 +72,20 @@ public class AttachmentHelper {
     }
 
     public List<SignalServiceAttachment> uploadAttachments(final List<String> attachments) throws AttachmentInvalidException, IOException {
-        return uploadAttachments(attachments, false);
+        return uploadAttachments(attachments, false, false);
     }
 
     private List<SignalServiceAttachmentStream> createAttachmentStreams(
             List<String> attachments,
-            boolean voiceNote
+            boolean voiceNote,
+            boolean setVideoPreview
     ) throws AttachmentInvalidException, IOException {
         if (attachments == null) {
             return null;
         }
         final var signalServiceAttachments = new ArrayList<SignalServiceAttachmentStream>(attachments.size());
         for (var attachment : attachments) {
-            final var attachmentStream = getAttachmentStream(attachment, voiceNote);
+            final var attachmentStream = getAttachmentStream(attachment, voiceNote, setVideoPreview);
             signalServiceAttachments.add(attachmentStream);
         }
         return signalServiceAttachments;
@@ -91,7 +93,8 @@ public class AttachmentHelper {
 
     private SignalServiceAttachmentStream getAttachmentStream(
             final String attachment,
-            final boolean voiceNote
+            final boolean voiceNote,
+            final boolean setVideoPreview
     ) throws AttachmentInvalidException {
         try {
             // Reject local files that point into the signal-cli data directory
@@ -116,6 +119,7 @@ public class AttachmentHelper {
             return AttachmentUtils.createAttachmentStream(streamDetails,
                     streamDetailsAndFileName.second(),
                     voiceNote,
+                    setVideoPreview,
                     uploadSpec);
         } catch (IOException e) {
             throw new AttachmentInvalidException(attachment, e);
@@ -130,7 +134,7 @@ public class AttachmentHelper {
     }
 
     public SignalServiceAttachmentPointer uploadAttachment(String attachment) throws IOException, AttachmentInvalidException {
-        final var attachmentStream = getAttachmentStream(attachment, false);
+        final var attachmentStream = getAttachmentStream(attachment, false, false);
         return uploadAttachment(attachmentStream);
     }
 

@@ -973,7 +973,7 @@ public class ManagerImpl implements Manager {
         }
         if (!message.attachments().isEmpty()) {
             final var uploadedAttachments = context.getAttachmentHelper()
-                    .uploadAttachments(message.attachments(), message.voiceNote());
+                    .uploadAttachments(message.attachments(), message.voiceNote(), message.setVideoPreview());
             if (!additionalAttachments.isEmpty()) {
                 additionalAttachments.addAll(uploadedAttachments);
                 messageBuilder.withAttachments(additionalAttachments);

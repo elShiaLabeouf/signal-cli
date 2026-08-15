@@ -27,10 +27,11 @@ public class AttachmentUtils {
             StreamDetails streamDetails,
             Optional<String> name,
             boolean voiceNote,
+            boolean setVideoPreview,
             ResumableUploadSpec resumableUploadSpec
     ) throws ResumeLocationInvalidException, IOException {
         final var uploadTimestamp = System.currentTimeMillis();
-        final var probedStream = probeImageDimensions(streamDetails);
+        final var probedStream = probeMediaDimensions(streamDetails, setVideoPreview);
         return SignalServiceAttachmentStream.newStreamBuilder()
                 .withStream(probedStream.inputStream())
                 .withContentType(streamDetails.getContentType())
@@ -50,21 +51,33 @@ public class AttachmentUtils {
             Optional<String> name,
             ResumableUploadSpec resumableUploadSpec
     ) throws ResumeLocationInvalidException, IOException {
-        return createAttachmentStream(streamDetails, name, false, resumableUploadSpec);
+        return createAttachmentStream(streamDetails, name, false, false, resumableUploadSpec);
     }
 
     /**
-     * Reads the attachment's dimensions if it's an image, so recipients don't get a square-cropped thumbnail.
-     * Falls back to width/height 0 (today's behavior) if the content isn't an image, is too large to probe
-     * cheaply, or fails to parse.
+     * Reads the attachment's dimensions if it's an image, so recipients don't get a square-cropped thumbnail, or
+     * if it's a video and the caller opted in via {@code setVideoPreview} (this is off by default: it's a newer,
+     * less battle-tested probe than the image one, and callers with existing automated workflows shouldn't have
+     * outgoing attachment metadata change under them without asking for it). Falls back to width/height 0
+     * (today's behavior) if the content doesn't qualify, is too large to probe cheaply, or fails to parse.
      */
-    private static ProbedStream probeImageDimensions(StreamDetails streamDetails) throws IOException {
+    private static ProbedStream probeMediaDimensions(
+            StreamDetails streamDetails,
+            boolean setVideoPreview
+    ) throws IOException {
         final var contentType = streamDetails.getContentType();
+        if (contentType != null && contentType.startsWith("image/")) {
+            return probeImageDimensions(streamDetails);
+        }
+        if (setVideoPreview && contentType != null && MediaDimensionProbe.isProbeableVideo(contentType)) {
+            return probeVideoDimensions(streamDetails);
+        }
+        return new ProbedStream(streamDetails.getStream(), 0, 0);
+    }
+
+    private static ProbedStream probeImageDimensions(StreamDetails streamDetails) throws IOException {
         final var length = streamDetails.getLength();
-        if (contentType == null
-                || !contentType.startsWith("image/")
-                || length <= 0
-                || length > MAX_DIMENSION_PROBE_SIZE) {
+        if (length <= 0 || length > MAX_DIMENSION_PROBE_SIZE) {
             return new ProbedStream(streamDetails.getStream(), 0, 0);
         }
 
@@ -97,6 +110,34 @@ public class AttachmentUtils {
             logger.debug("Failed to probe image dimensions, sending without width/height: {}", e.getMessage());
         }
         return new ProbedStream(new ByteArrayInputStream(bytes), width, height);
+    }
+
+    /**
+     * Reads a video container's header (MP4/QuickTime "moov", WebM/Matroska "Tracks") to recover width/height,
+     * without decoding any frames. See {@link MediaDimensionProbe} for the parsing itself; this method only
+     * handles the stream plumbing, mirroring {@link #probeImageDimensions}.
+     */
+    private static ProbedStream probeVideoDimensions(StreamDetails streamDetails) throws IOException {
+        final var contentType = streamDetails.getContentType();
+        final var stream = streamDetails.getStream();
+        if (stream instanceof FileInputStream fis) {
+            var dimensions = MediaDimensionProbe.Dimensions.UNKNOWN;
+            try {
+                dimensions = MediaDimensionProbe.probeFromChannel(contentType, fis.getChannel());
+            } catch (IOException | RuntimeException e) {
+                logger.debug("Failed to probe video dimensions, sending without width/height: {}", e.getMessage());
+            } finally {
+                try {
+                    fis.getChannel().position(0);
+                } catch (IOException e) {
+                    logger.debug("Failed to reset video attachment stream position: {}", e.getMessage());
+                }
+            }
+            return new ProbedStream(fis, dimensions.width(), dimensions.height());
+        }
+
+        final var result = MediaDimensionProbe.probeFromStream(contentType, stream);
+        return new ProbedStream(result.stream(), result.width(), result.height());
     }
 
     private record ProbedStream(InputStream inputStream, int width, int height) {}

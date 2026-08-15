@@ -112,6 +112,11 @@ public class SendCommand implements JsonRpcLocalCommand {
         subparser.addArgument("--voice-note")
                 .action(Arguments.storeTrue())
                 .help("Mark audio attachments as voice notes. Voice notes are displayed inline in Signal clients.");
+        subparser.addArgument("--set-video-preview")
+                .action(Arguments.storeTrue())
+                .help("Probe video attachments' dimensions and include them in the attachment metadata, so "
+                        + "recipients see a video tile instead of a generic file row before downloading. Off by "
+                        + "default, since it changes outgoing attachment metadata for existing automated workflows.");
     }
 
     @Override
@@ -174,6 +179,7 @@ public class SendCommand implements JsonRpcLocalCommand {
         }
         final var viewOnce = Boolean.TRUE.equals(ns.getBoolean("view-once"));
         final var voiceNote = Boolean.TRUE.equals(ns.getBoolean("voice-note"));
+        final var setVideoPreview = Boolean.TRUE.equals(ns.getBoolean("set-video-preview"));
 
         final var selfNumber = m.getSelfNumber();
 
@@ -251,6 +257,7 @@ public class SendCommand implements JsonRpcLocalCommand {
                     attachments,
                     viewOnce,
                     voiceNote,
+                    setVideoPreview,
                     mentions,
                     Optional.ofNullable(quote),
                     Optional.ofNullable(sticker),

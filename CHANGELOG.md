@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Improved
+
+- Set width/height for outgoing video attachments (MP4/QuickTime and WebM/Matroska)
+
 ## [0.14.7] - 2026-08-01
 
 ### Added

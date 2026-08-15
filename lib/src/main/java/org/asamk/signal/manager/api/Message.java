@@ -8,6 +8,7 @@ public record Message(
         List<String> attachments,
         boolean viewOnce,
         boolean voiceNote,
+        boolean setVideoPreview,
         List<Mention> mentions,
         Optional<Quote> quote,
         Optional<Sticker> sticker,
